@@ -7,14 +7,14 @@ Após a criação do pedido, o cliente pode necessitar incluir novos itens antes
 
 ## Tarefa
 Implementar o fluxo completo de adição de item composto por:
-1. **Port de Entrada (`AdicionarItem`)**: Interface que declara a operação de adicionar item a um pedido existente (`UUID pedidoId, ItemComando item`).
+1. **Port de Entrada (`AdicionarItem`)**: Interface que declara a operação de adicionar item a um pedido existente (`UUID pedidoId, String produtoId, int quantidade, BigDecimal precoUnitario`).
 2. **Exceção de Aplicação (`PedidoNaoEncontradoException`)**: Exceção pura indicando que o ID informado não corresponde a nenhum pedido cadastrado.
 3. **Serviço de Aplicação (`AdicionarItemService`)**: Implementação pura do caso de uso.
 4. **Configuração de Injeção (`CasosDeUsoConfig`)**: Registro do `@Bean` de `AdicionarItem`.
 5. **Endpoint REST no `PedidoController`**: `POST /pedidos/{id}/itens` devolvendo HTTP `200 OK` com o `PedidoResponse` atualizado.
 6. **Ampliação do `PedidoExceptionHandler`**: Mapeamento semântico de erros:
    - `PedidoNaoEncontradoException` -> HTTP `404 Not Found`;
-   - `IllegalStateException` (pedido fechado/pago/cancelado) -> HTTP `409 Conflict`;
+   - `PedidoFechadoException` (subclasse de `IllegalStateException`) (pedido fechado/pago/cancelado) -> HTTP `409 Conflict`;
    - `ItemInvalidoException` (quantidade ou preço inválido) -> HTTP `422 Unprocessable Entity`.
 7. **Testes Unitários Automatizados**: Cobertura completa com fake em memória para a aplicação e integração ponta a ponta.
 
@@ -33,7 +33,7 @@ Implementar o fluxo completo de adição de item composto por:
 
 ### 3. Integridade e Regras de Domínio
 - O serviço chama o método de comportamento do domínio `pedido.adicionarItem(novoItem)`.
-- **Pedido Fechado:** Se o pedido estiver `PAGO` ou `CANCELADO`, o domínio recusa a adição lançando `IllegalStateException`, que o handler REST converte para HTTP `409 Conflict`.
+- **Pedido Fechado:** Se o pedido estiver `PAGO` ou `CANCELADO`, o domínio recusa a adição lançando `PedidoFechadoException` (subclasse de `IllegalStateException`), que o handler REST converte para HTTP `409 Conflict`.
 - **Item Inválido:** Se a quantidade for `<= 0` ou o preço unitário for `<= 0`, o domínio recusa lançando `ItemInvalidoException`, que o handler REST converte para HTTP `422 Unprocessable Entity`.
 
 ### 4. Recálculo do Total e Persistência
@@ -83,7 +83,7 @@ Implementar o fluxo completo de adição de item composto por:
 ### Casos de Teste Unitário (`AdicionarItemServiceTest`)
 1. **Adição bem-sucedida:** Adiciona item válido a pedido aberto existente; valida que o retorno possui o mesmo UUID, itens acumulados e total atualizado.
 2. **Pedido inexistente:** Tentar adicionar item a UUID inexistente deve lançar `PedidoNaoEncontradoException`.
-3. **Pedido fechado:** Tentar adicionar item a pedido com status `PAGO` ou `CANCELADO` deve propagar `IllegalStateException`.
+3. **Pedido fechado:** Tentar adicionar item a pedido com status `PAGO` ou `CANCELADO` deve propagar `PedidoFechadoException` (subclasse de `IllegalStateException`).
 4. **Item com quantidade inválida:** Tentar adicionar item com quantidade `<= 0` deve propagar `ItemInvalidoException`.
 5. **Item com preço inválido:** Tentar adicionar item com preço `<= 0` deve propagar `ItemInvalidoException`.
 
