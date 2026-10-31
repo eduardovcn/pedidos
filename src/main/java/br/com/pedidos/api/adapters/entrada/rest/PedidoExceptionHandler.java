@@ -1,7 +1,9 @@
 package br.com.pedidos.api.adapters.entrada.rest;
 
+import br.com.pedidos.api.application.exception.FalhaPublicacaoException;
 import br.com.pedidos.api.application.exception.PedidoNaoEncontradoException;
 import br.com.pedidos.api.application.exception.PedidoSemItensException;
+import br.com.pedidos.api.application.exception.SolicitacaoPagamentoConflitoException;
 import br.com.pedidos.api.domain.ItemInvalidoException;
 import br.com.pedidos.api.domain.PedidoFechadoException;
 import org.springframework.http.HttpStatus;
@@ -10,6 +12,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.Map;
 
@@ -28,10 +31,23 @@ public class PedidoExceptionHandler {
                 .body(Map.of("mensagem", ex.getMessage()));
     }
 
-    @ExceptionHandler(PedidoFechadoException.class)
-    public ResponseEntity<Map<String, String>> tratarConflitoDeEstado(PedidoFechadoException ex) {
+    @ExceptionHandler({PedidoFechadoException.class, SolicitacaoPagamentoConflitoException.class})
+    public ResponseEntity<Map<String, String>> tratarConflitoDeEstado(IllegalStateException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("mensagem", ex.getMessage()));
+    }
+
+    @ExceptionHandler(FalhaPublicacaoException.class)
+    public ResponseEntity<Map<String, String>> tratarFalhaDePublicacao(FalhaPublicacaoException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("mensagem", "Solicitação registrada, mas a publicação não foi confirmada. "
+                        + "Repita o POST com o mesmo solicitacaoId."));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, String>> tratarParametroInvalido(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("mensagem", "Parâmetro inválido: " + ex.getName()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

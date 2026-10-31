@@ -58,7 +58,7 @@ class PedidoTest {
         var pedido = Pedido.novo("c-1")
                 .adicionarItem(new ItemPedido("CAFE-500", 2, new BigDecimal("18.90")));
 
-        var pedidoPago = pedido.pagar();
+        var pedidoPago = pedido.iniciarPagamento().confirmarPagamento();
 
         assertNotSame(pedido, pedidoPago);
         assertEquals(StatusPedido.ABERTO, pedido.status());
@@ -99,7 +99,7 @@ class PedidoTest {
     void deveRecusarAdicionarItemEmPedidoPago() {
         var pedidoPago = Pedido.novo("c-1")
                 .adicionarItem(new ItemPedido("CAFE-500", 2, new BigDecimal("18.90")))
-                .pagar();
+                .iniciarPagamento().confirmarPagamento();
 
         var novoItem = new ItemPedido("NOVO-1", 1, BigDecimal.TEN);
 
@@ -119,9 +119,9 @@ class PedidoTest {
     @Test
     @DisplayName("Caso 12: Deve recusar transições a partir de pedido PAGO")
     void deveRecusarTransicoesEmPedidoPago() {
-        var pedidoPago = Pedido.novo("c-1").pagar();
+        var pedidoPago = Pedido.novo("c-1").iniciarPagamento().confirmarPagamento();
 
-        assertThrows(IllegalStateException.class, pedidoPago::pagar);
+        assertThrows(IllegalStateException.class, pedidoPago::iniciarPagamento);
         assertThrows(IllegalStateException.class, pedidoPago::cancelar);
     }
 
@@ -130,7 +130,7 @@ class PedidoTest {
     void deveRecusarTransicoesEmPedidoCancelado() {
         var pedidoCancelado = Pedido.novo("c-1").cancelar();
 
-        assertThrows(IllegalStateException.class, pedidoCancelado::pagar);
+        assertThrows(IllegalStateException.class, pedidoCancelado::iniciarPagamento);
         assertThrows(IllegalStateException.class, pedidoCancelado::cancelar);
     }
 
@@ -140,4 +140,28 @@ class PedidoTest {
         assertThrows(NullPointerException.class, () -> Pedido.novo(null));
         assertThrows(IllegalArgumentException.class, () -> Pedido.novo("   "));
     }
-}
+
+    @Test
+    @DisplayName("Pagamento: ABERTO -> EM_PAGAMENTO -> PAGO e recusa volta a ABERTO")
+    void deveTransitarPeloFluxoDePagamento() {
+        var aberto = Pedido.novo("c-1").adicionarItem(new ItemPedido("CAFE-500", 2, new BigDecimal("18.90")));
+
+        var emPagamento = aberto.iniciarPagamento();
+        assertEquals(StatusPedido.EM_PAGAMENTO, emPagamento.status());
+        assertEquals(aberto.itens(), emPagamento.itens());
+        assertEquals(StatusPedido.PAGO, emPagamento.confirmarPagamento().status());
+        assertEquals(StatusPedido.ABERTO, emPagamento.recusarPagamento().status());
+    }
+
+    @Test
+    @DisplayName("Pagamento: itens não mudam e transições inválidas são recusadas em EM_PAGAMENTO")
+    void deveRecusarOperacoesInvalidasEmPagamento() {
+        var emPagamento = Pedido.novo("c-1").iniciarPagamento();
+        var item = new ItemPedido("NOVO-1", 1, BigDecimal.TEN);
+
+        assertThrows(PedidoFechadoException.class, () -> emPagamento.adicionarItem(item));
+        assertThrows(PedidoFechadoException.class, emPagamento::iniciarPagamento);
+        assertThrows(PedidoFechadoException.class, emPagamento::cancelar);
+        assertThrows(PedidoFechadoException.class, () -> Pedido.novo("c-1").confirmarPagamento());
+        assertThrows(PedidoFechadoException.class, () -> Pedido.novo("c-1").recusarPagamento());
+    }}

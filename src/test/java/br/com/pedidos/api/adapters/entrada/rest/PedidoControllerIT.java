@@ -116,7 +116,7 @@ class PedidoControllerIT {
     @Test
     @DisplayName("POST /pedidos/{id}/itens em pedido PAGO retorna 409 sem gravar linhas")
     void pedidoFechado() throws Exception {
-        Pedido pago = pedidos.salvar(pedidoAbertoPersistido().pagar());
+        Pedido pago = pedidos.salvar(pedidoAbertoPersistido().iniciarPagamento().confirmarPagamento());
         long i = linhas("item_pedido");
         mockMvc.perform(post("/pedidos/{id}/itens", pago.id()).contentType(MediaType.APPLICATION_JSON)
                         .content(ITEM_VALIDO))

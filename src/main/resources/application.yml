@@ -14,3 +14,19 @@ spring:
       hibernate:
         format_sql: true
     show-sql: false
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: aula
+    password: aula-local # credencial didática do infra/docker-compose.yml (apenas local)
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 500ms

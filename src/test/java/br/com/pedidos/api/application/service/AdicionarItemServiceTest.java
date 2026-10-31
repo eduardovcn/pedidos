@@ -64,7 +64,7 @@ class AdicionarItemServiceTest {
     void deveRecusarAdicionarItemEmPedidoFechado() {
         var pedidoPago = Pedido.novo("c-1")
                 .adicionarItem(new ItemPedido("CAFE-500", 1, new BigDecimal("18.90")))
-                .pagar();
+                .iniciarPagamento().confirmarPagamento();
         pedidosEmMemoria.salvar(pedidoPago);
 
         assertThrows(IllegalStateException.class, () ->

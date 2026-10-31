@@ -35,4 +35,11 @@ public class PedidosJpaAdapter implements Pedidos {
         return repository.buscarPorIdComItens(id)
                 .map(PedidoJpaMapper::paraDominio);
     }
+
+    @Override
+    @Transactional
+    public Optional<Pedido> porIdParaAtualizacao(UUID id) {
+        return repository.buscarPorIdComBloqueio(id)
+                .map(PedidoJpaMapper::paraDominio);
+    }
 }

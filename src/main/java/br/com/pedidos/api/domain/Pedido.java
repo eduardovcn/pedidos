@@ -38,13 +38,26 @@ public record Pedido(UUID id, String clienteId, StatusPedido status, List<ItemPe
         return new Pedido(id, clienteId, status, novosItens);
     }
 
-    public Pedido pagar() {
+    public Pedido iniciarPagamento() {
         if (status != StatusPedido.ABERTO) {
-            throw new PedidoFechadoException("Apenas pedidos ABERTO podem ser pagos. Status atual: " + status);
+            throw new PedidoFechadoException("Apenas pedidos ABERTO podem iniciar pagamento. Status atual: " + status);
+        }
+        return new Pedido(id, clienteId, StatusPedido.EM_PAGAMENTO, itens);
+    }
+
+    public Pedido confirmarPagamento() {
+        if (status != StatusPedido.EM_PAGAMENTO) {
+            throw new PedidoFechadoException("Apenas pedidos EM_PAGAMENTO podem ser pagos. Status atual: " + status);
         }
         return new Pedido(id, clienteId, StatusPedido.PAGO, itens);
     }
 
+    public Pedido recusarPagamento() {
+        if (status != StatusPedido.EM_PAGAMENTO) {
+            throw new PedidoFechadoException("Apenas pedidos EM_PAGAMENTO podem ter o pagamento recusado. Status atual: " + status);
+        }
+        return new Pedido(id, clienteId, StatusPedido.ABERTO, itens);
+    }
     public Pedido cancelar() {
         if (status != StatusPedido.ABERTO) {
             throw new PedidoFechadoException("Apenas pedidos ABERTO podem ser cancelados. Status atual: " + status);
