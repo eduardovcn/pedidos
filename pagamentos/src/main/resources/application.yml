@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: pagamentos
+  datasource:
+    # Banco proprio "pagamentos" no Postgres do Compose (credencial didatica local, a mesma de infra/docker-compose.yml)
+    url: jdbc:postgresql://localhost:5433/pagamentos
+    username: pedidos
+    password: pedidos
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: aula
+    password: aula-local # credencial didatica do infra/docker-compose.yml (apenas local)
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 500ms
+server:
+  port: 8081
