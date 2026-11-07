@@ -57,10 +57,14 @@ class AplicarResultadoPagamentoServiceTest {
     @Test
     @DisplayName("Recusa devolve o pedido a ABERTO")
     void recusa() {
-        service.executar(resultado(false));
+        UUID recusaSolId = UUID.randomUUID();
+        solicitacoes.salvar(SolicitacaoPagamento
+                .nova(recusaSolId, pedido.id(), pedido.total(), CenarioPagamento.RECUSAR).publicada());
+
+        service.executar(new ResultadoPagamento(recusaSolId, pedido.id(), new BigDecimal("37.8"), false, "SIMULADO"));
 
         assertEquals(StatusPedido.ABERTO, pedidos.dados.get(pedido.id()).status());
-        assertEquals(Situacao.RECUSADA, solicitacoes.dados.get(solicitacaoId).situacao());
+        assertEquals(Situacao.RECUSADA, solicitacoes.dados.get(recusaSolId).situacao());
     }
 
     @Test
@@ -77,6 +81,29 @@ class AplicarResultadoPagamentoServiceTest {
         service.executar(resultado(true));
 
         assertThrows(ResultadoPagamentoInvalidoException.class, () -> service.executar(resultado(false)));
+        assertEquals(StatusPedido.PAGO, pedidos.dados.get(pedido.id()).status());
+    }
+
+    @Test
+    @DisplayName("Resultado com desfecho divergente do cenário da solicitação é rejeitado")
+    void divergenciaCenario() {
+        // solicitacaoId foi criada com APROVAR, mas resultado veio com aprovado=false
+        assertThrows(ResultadoPagamentoInvalidoException.class, () -> service.executar(resultado(false)));
+        assertEquals(StatusPedido.EM_PAGAMENTO, pedidos.dados.get(pedido.id()).status());
+    }
+
+    @Test
+    @DisplayName("Evento atrasado não reabre pedido já pago")
+    void eventoAtrasadoNaoReabrePedidoPago() {
+        service.executar(resultado(true));
+        assertEquals(StatusPedido.PAGO, pedidos.dados.get(pedido.id()).status());
+
+        UUID outraSolId = UUID.randomUUID();
+        solicitacoes.salvar(SolicitacaoPagamento
+                .nova(outraSolId, pedido.id(), pedido.total(), CenarioPagamento.RECUSAR).publicada());
+
+        assertThrows(ResultadoPagamentoInvalidoException.class, () -> service.executar(
+                new ResultadoPagamento(outraSolId, pedido.id(), new BigDecimal("37.8"), false, "SIMULADO")));
         assertEquals(StatusPedido.PAGO, pedidos.dados.get(pedido.id()).status());
     }
 

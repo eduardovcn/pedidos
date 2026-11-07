@@ -6,6 +6,7 @@ import br.com.pedidos.api.application.port.in.AplicarResultadoPagamento;
 import br.com.pedidos.api.application.port.out.Pedidos;
 import br.com.pedidos.api.application.port.out.SolicitacoesPagamento;
 import br.com.pedidos.api.application.port.out.Transacao;
+import br.com.pedidos.api.domain.CenarioPagamento;
 import br.com.pedidos.api.domain.Pedido;
 import br.com.pedidos.api.domain.SolicitacaoPagamento;
 import br.com.pedidos.api.domain.StatusPedido;
@@ -42,6 +43,13 @@ public class AplicarResultadoPagamentoService implements AplicarResultadoPagamen
                 || solicitacao.valor().compareTo(resultado.valor()) != 0) {
             throw new ResultadoPagamentoInvalidoException(
                     "Resultado diverge da solicitação " + resultado.solicitacaoId() + " (pedidoId ou valor)");
+        }
+
+        boolean esperadoAprovado = solicitacao.cenario() == CenarioPagamento.APROVAR;
+        if (resultado.aprovado() != esperadoAprovado) {
+            throw new ResultadoPagamentoInvalidoException(
+                    "Resultado diverge do cenário da solicitação " + resultado.solicitacaoId()
+                            + " (cenário=" + solicitacao.cenario() + ", aprovado=" + resultado.aprovado() + ")");
         }
 
         if (solicitacao.concluida()) {

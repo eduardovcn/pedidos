@@ -102,18 +102,73 @@ class PagamentoFluxoIT {
 
         publicarResultado(pedido, solicitacaoId, new BigDecimal("37.80"), true);
         aguardarStatus(pedido.id(), StatusPedido.PAGO);
+
+        mockMvc.perform(get("/pedidos/{id}", pedido.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAGO"))
+                .andExpect(jsonPath("$.total").value(37.80));
     }
 
     @Test
-    @DisplayName("Recusa devolve o pedido a ABERTO")
+    @DisplayName("Recusa devolve o pedido a ABERTO e consulta confirma estado")
     void fluxoRecusado() throws Exception {
         Pedido pedido = pedidoAberto();
         UUID solicitacaoId = UUID.randomUUID();
         solicitar(pedido.id(), solicitacaoId, "RECUSAR", 202);
 
+        mockMvc.perform(get("/pedidos/{id}", pedido.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EM_PAGAMENTO"));
+
         publicarResultado(pedido, solicitacaoId, new BigDecimal("37.80"), false);
 
         aguardarStatus(pedido.id(), StatusPedido.ABERTO);
+
+        mockMvc.perform(get("/pedidos/{id}", pedido.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ABERTO"))
+                .andExpect(jsonPath("$.total").value(37.80));
+    }
+
+    @Test
+    @DisplayName("Resultado duplicado é idempotente e pedido permanece PAGO")
+    void resultadoDuplicado() throws Exception {
+        Pedido pedido = pedidoAberto();
+        UUID solicitacaoId = UUID.randomUUID();
+        solicitar(pedido.id(), solicitacaoId, "APROVAR", 202);
+
+        publicarResultado(pedido, solicitacaoId, new BigDecimal("37.80"), true);
+        aguardarStatus(pedido.id(), StatusPedido.PAGO);
+
+        // Reenvio do mesmo resultado já concluído
+        publicarResultado(pedido, solicitacaoId, new BigDecimal("37.80"), true);
+
+        // Espera breve para processamento assíncrono
+        Thread.sleep(1000);
+
+        mockMvc.perform(get("/pedidos/{id}", pedido.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAGO"));
+        assertNull(rabbitTemplate.receive(FILA_RESULTADOS_ERROS, 500), "duplicata não deve ir para DLQ");
+    }
+
+    @Test
+    @DisplayName("Conteúdo incompatível (cenário divergente do pedido) vai para DLQ e não altera pedido")
+    void cenarioIncompativelVaiParaDlq() throws Exception {
+        Pedido pedido = pedidoAberto();
+        UUID solicitacaoId = UUID.randomUUID();
+        // Pedido solicitou APROVAR
+        solicitar(pedido.id(), solicitacaoId, "APROVAR", 202);
+
+        // Resultado simulado entrega false (incompatível com o laboratório determinístico)
+        publicarResultado(pedido, solicitacaoId, new BigDecimal("37.80"), false);
+
+        assertNotNull(rabbitTemplate.receive(FILA_RESULTADOS_ERROS, 10000), "deve ir para a DLQ de erros");
+
+        // Pedido permanece intacto em EM_PAGAMENTO
+        mockMvc.perform(get("/pedidos/{id}", pedido.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EM_PAGAMENTO"));
     }
 
     @Test
